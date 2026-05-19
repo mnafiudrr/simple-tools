@@ -1,5 +1,23 @@
 import { parseSvgDimensions } from './qr'
 
+/**
+ * Validate and normalise a hex colour string.
+ * Accepts `#RRGGBB`, `RRGGBB`, `#RGB`, or `RGB`.
+ * Returns the normalised `#RRGGBB` form, or `null` if invalid.
+ */
+export function parseHexColor(raw: string | undefined | null): string | null {
+  if (!raw) return null
+  const hex = raw.trim().replace(/^#/, '')
+  if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+    // Expand shorthand #RGB → #RRGGBB
+    return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+    return `#${hex.toLowerCase()}`
+  }
+  return null
+}
+
 // Text size presets as ratio of QR size
 export const TEXT_SIZE_RATIOS: Record<string, number> = {
   sm: 0.04,
@@ -59,13 +77,15 @@ interface LabelOptions {
   textSizeKey: string
   paddingSizeKey: string
   size: number
+  color?: string
+  colorBg?: string
 }
 
 /**
  * Build a composite SVG with the QR code and a text label positioned around it.
  */
 export function buildLabeledSvg(qrSvgString: string, options: LabelOptions): string {
-  const { label, labelPosition, textSizeKey, paddingSizeKey, size } = options
+  const { label, labelPosition, textSizeKey, paddingSizeKey, size, color, colorBg } = options
 
   const { width: qrWidth, height: qrHeight, viewBox } = parseSvgDimensions(qrSvgString, size)
 
@@ -154,12 +174,12 @@ export function buildLabeledSvg(qrSvgString: string, options: LabelOptions): str
     .map((line, i) => {
       const escapedLine = escapeXml(line)
       const y = textPadding + fontSize + i * lineHeight
-      return `    <text x="${labelAreaWidth / 2}" y="${y}" font-family="sans-serif" font-size="${fontSize}" fill="#000000" text-anchor="middle" dominant-baseline="auto">${escapedLine}</text>`
+      return `    <text x="${labelAreaWidth / 2}" y="${y}" font-family="sans-serif" font-size="${fontSize}" fill="${color || '#000000'}" text-anchor="middle" dominant-baseline="auto">${escapedLine}</text>`
     })
     .join('\n')
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}">
-    <rect width="${canvasWidth}" height="${canvasHeight}" fill="#FFFFFF"/>
+    <rect width="${canvasWidth}" height="${canvasHeight}" fill="${colorBg || '#FFFFFF'}"/>
     <g transform="translate(${qrX}, ${qrY})">
       <svg width="${qrWidth}" height="${qrHeight}" viewBox="${escapeXml(viewBox)}">
         ${svgInnerContent}
@@ -186,6 +206,7 @@ export function embedIconInSvg(
   qrSvgString: string,
   iconDataUri: string,
   iconRatio = 0.25,
+  colorBg = '#FFFFFF',
 ): string {
   const { viewBox } = parseSvgDimensions(qrSvgString, 300)
 
@@ -214,7 +235,7 @@ export function embedIconInSvg(
 
   return `${svgOpenTag}
     ${svgInnerContent}
-    <rect x="${bgX}" y="${bgY}" width="${bgSize}" height="${bgSize}" rx="${rx}" ry="${rx}" fill="#FFFFFF"/>
+    <rect x="${bgX}" y="${bgY}" width="${bgSize}" height="${bgSize}" rx="${rx}" ry="${rx}" fill="${colorBg}"/>
     <image href="${iconDataUri}" x="${iconX}" y="${iconY}" width="${iconSize}" height="${iconSize}"/>
   </svg>`
 }

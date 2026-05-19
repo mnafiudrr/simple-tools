@@ -7,12 +7,14 @@ export async function generateQrSvg(
   text: string,
   size: number,
   errorCorrectionLevel: 'L' | 'M' | 'Q' | 'H' = 'M',
+  color?: { dark?: string; light?: string },
 ): Promise<string> {
   return QRCode.toString(text, {
     type: 'svg',
     margin: 2,
     width: size,
     errorCorrectionLevel,
+    color,
   })
 }
 
