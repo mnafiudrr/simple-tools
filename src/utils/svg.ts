@@ -47,10 +47,10 @@ export function wrapText(text: string, maxWidth: number, fontSize: number): stri
 
 export function escapeXml(str: string): string {
   return str
-    .replace(/&/g, '&')
-    .replace(/</g, '<')
-    .replace(/>/g, '>')
-    .replace(/"/g, '"')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 interface LabelOptions {
