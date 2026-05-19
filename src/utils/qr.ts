@@ -3,12 +3,16 @@ import QRCode from 'qrcode'
 /**
  * Generate a QR code as an SVG string.
  */
-export async function generateQrSvg(text: string, size: number): Promise<string> {
+export async function generateQrSvg(
+  text: string,
+  size: number,
+  errorCorrectionLevel: 'L' | 'M' | 'Q' | 'H' = 'M',
+): Promise<string> {
   return QRCode.toString(text, {
     type: 'svg',
     margin: 2,
     width: size,
-    errorCorrectionLevel: 'M',
+    errorCorrectionLevel,
   })
 }
 

@@ -159,14 +159,62 @@ export function buildLabeledSvg(qrSvgString: string, options: LabelOptions): str
     .join('\n')
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}">
-  <rect width="${canvasWidth}" height="${canvasHeight}" fill="#FFFFFF"/>
-  <g transform="translate(${qrX}, ${qrY})">
-    <svg width="${qrWidth}" height="${qrHeight}" viewBox="${escapeXml(viewBox)}">
-      ${svgInnerContent}
-    </svg>
-  </g>
-  <g transform="translate(${labelBoxX}, ${labelBoxY})">
-${textElements}
-  </g>
-</svg>`
+    <rect width="${canvasWidth}" height="${canvasHeight}" fill="#FFFFFF"/>
+    <g transform="translate(${qrX}, ${qrY})">
+      <svg width="${qrWidth}" height="${qrHeight}" viewBox="${escapeXml(viewBox)}">
+        ${svgInnerContent}
+      </svg>
+    </g>
+    <g transform="translate(${labelBoxX}, ${labelBoxY})">
+  ${textElements}
+    </g>
+  </svg>`
+  }
+  
+/**
+ * Embed an icon image (as base64 data URI) at the center of a QR code SVG.
+ * Adds a white rounded-rect background behind the icon for readability.
+ *
+ * All coordinates are computed in the SVG's viewBox coordinate space so the
+ * icon is correctly positioned regardless of the viewBox-to-pixel ratio.
+ *
+ * @param qrSvgString  — the raw QR SVG string
+ * @param iconDataUri   — base64 data URI of the icon (e.g. "data:image/png;base64,…")
+ * @param iconRatio     — icon size as a fraction of QR viewBox size (default 0.25 = 25%)
+ */
+export function embedIconInSvg(
+  qrSvgString: string,
+  iconDataUri: string,
+  iconRatio = 0.25,
+): string {
+  const { viewBox } = parseSvgDimensions(qrSvgString, 300)
+
+  // Parse the viewBox to get the coordinate space dimensions
+  const vbParts = viewBox.split(/[\s,]+/).map(Number)
+  const vbWidth = vbParts[2] || 300
+  const vbHeight = vbParts[3] || 300
+
+  // Calculate icon dimensions in viewBox units
+  const iconSize = vbWidth * iconRatio
+  const padding = iconSize * 0.08
+  const bgSize = iconSize + padding * 2
+  const bgX = (vbWidth - bgSize) / 2
+  const bgY = (vbHeight - bgSize) / 2
+  const iconX = (vbWidth - iconSize) / 2
+  const iconY = (vbHeight - iconSize) / 2
+  const rx = bgSize * 0.1
+
+  // Extract inner content of the QR SVG
+  const svgContentMatch = qrSvgString.match(/<svg[^>]*>([\s\S]*)<\/svg>/)
+  const svgInnerContent = svgContentMatch ? svgContentMatch[1] : ''
+
+  // Re-use the original outer <svg> tag attributes (width, height, viewBox)
+  const svgTagMatch = qrSvgString.match(/<svg[^>]*>/)
+  const svgOpenTag = svgTagMatch ? svgTagMatch[0] : '<svg xmlns="http://www.w3.org/2000/svg">'
+
+  return `${svgOpenTag}
+    ${svgInnerContent}
+    <rect x="${bgX}" y="${bgY}" width="${bgSize}" height="${bgSize}" rx="${rx}" ry="${rx}" fill="#FFFFFF"/>
+    <image href="${iconDataUri}" x="${iconX}" y="${iconY}" width="${iconSize}" height="${iconSize}"/>
+  </svg>`
 }
