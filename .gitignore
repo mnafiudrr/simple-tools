@@ -1,5 +1,7 @@
 # prod
 dist/
+cdk.out/
+lambda-full/
 
 # dev
 .yarn/

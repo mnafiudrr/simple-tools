@@ -161,7 +161,7 @@ export function buildLabeledSvg(qrSvgString: string, options: LabelOptions): str
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}">
   <rect width="${canvasWidth}" height="${canvasHeight}" fill="#FFFFFF"/>
   <g transform="translate(${qrX}, ${qrY})">
-    <svg width="${qrWidth}" height="${qrHeight}" viewBox="${viewBox}">
+    <svg width="${qrWidth}" height="${qrHeight}" viewBox="${escapeXml(viewBox)}">
       ${svgInnerContent}
     </svg>
   </g>
