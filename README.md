@@ -30,11 +30,36 @@ bun run dev
 
 The server will start at `http://localhost:8787`.
 
+## Configuration
+
+### `BROWSERLESS_URL` and `PAGE_URL` (PNG output)
+
+PNG output (`return_type=png`) is rasterized by a [Browserless](https://www.browserless.io/) v2.51.0 headless-Chrome service. Two env vars are required:
+
+- **`BROWSERLESS_URL`** — base URL of your Browserless instance.
+- **`PAGE_URL`** — public origin of this Worker (e.g. `http://localhost:8787`). The `/qr` path is appended automatically.
+
+**Local dev** — create a `.env` file (see [`.env.example`](.env.example)):
+```
+BROWSERLESS_URL=http://localhost:3000
+PAGE_URL=http://localhost:8787
+```
+
+**Cloudflare Workers** — set them in [`wrangler.jsonc`](wrangler.jsonc) under `vars`, or for production secrets:
+```bash
+wrangler secret put BROWSERLESS_URL
+wrangler secret put PAGE_URL
+```
+
+**Browserless Cloud** — bake the API token into `BROWSERLESS_URL`, e.g. `https://chrome.browserless.io?token=YOUR_TOKEN`.
+
+The Worker calls `POST {BROWSERLESS_URL}/screenshot`, telling headless Chrome to load `{PAGE_URL}?<query>` (with `return_type` stripped to avoid an infinite loop) and screenshot the rendered SVG as PNG.
+
 ## API Usage
 
 ### `GET /qr`
 
-Generate a QR code as an SVG image.
+Generate a QR code as an SVG (default) or PNG image.
 
 #### General Parameters
 
@@ -45,6 +70,7 @@ Generate a QR code as an SVG image.
 | `size`            | No       | `300`     | QR code size in pixels (min: 50, max: 2000)                     |
 | `margin`          | No       | `2`       | Quiet zone margin in modules (`styled` only)                     |
 | `ec_level`        | No       | `M`       | Error correction level: `L`, `M`, `Q`, `H`                      |
+| `return_type`     | No       | `svg`     | Output format: `svg` or `png` (`png` requires `BROWSERLESS_URL`) |
 
 #### Color Parameters (both styles)
 
@@ -168,6 +194,13 @@ GET /qr?text=https://example.com&style=styled&dot_type=rounded&gradient_type=lin
 
 ```
 GET /qr?text=https://example.com&style=styled&dot_type=classy&icon_url=https://example.com/logo.png&icon_size=0.3&ec_level=H
+```
+
+**PNG output (requires `BROWSERLESS_URL`):**
+
+```
+GET /qr?text=hello-world&return_type=png
+GET /qr?text=https://example.com&style=styled&dot_type=dots&return_type=png&size=500
 ```
 
 **Styled QR with label:**

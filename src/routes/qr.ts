@@ -1,7 +1,8 @@
-import { Hono } from 'hono'
-import { generateQrSvg } from '../utils/qr'
+import { Hono, type Context } from 'hono'
+import { generateQrSvg, parseSvgDimensions } from '../utils/qr'
 import { generateStyledQrSvg } from '../utils/qr-styled'
 import { buildLabeledSvg, embedIconInSvg, parseHexColor } from '../utils/svg'
+import { renderPngViaBrowserless } from '../utils/browserless'
 
 export const qrRoutes = new Hono()
 
@@ -11,6 +12,38 @@ const CORNER_SQUARE_TYPES = new Set(['square', 'dot', 'extra-rounded'])
 const CORNER_DOT_TYPES = new Set(['square', 'dot'])
 const GRADIENT_TYPES = new Set(['linear', 'radial'])
 const EC_LEVELS = new Set(['L', 'M', 'Q', 'H'])
+const RETURN_TYPES = new Set(['svg', 'png'])
+
+/**
+ * Build the page URL Browserless should load.
+ *
+ * Uses the `PAGE_URL` env var (the public origin of this Worker, e.g.
+ * `http://localhost:8787`) and appends `/qr` plus the incoming query string
+ * with `return_type` stripped, so the inner request returns plain SVG and the
+ * Worker → Browserless → Worker recursion is broken.
+ */
+function buildSvgPageUrl(c: Context, pageUrlBase: string): string {
+  const incoming = new URL(c.req.url)
+  incoming.searchParams.delete('return_type')
+  const base = pageUrlBase.replace(/\/$/, '')
+  return `${base}/qr${incoming.search}`
+}
+
+/**
+ * Read an environment variable in a runtime-agnostic way.
+ *
+ * - Cloudflare Workers: vars are exposed on `c.env`.
+ * - AWS Lambda (hono/aws-lambda): vars live on `process.env` instead.
+ */
+function getEnv(c: Context, key: string): string | undefined {
+  const fromContext = (c.env as Record<string, string | undefined> | undefined)?.[key]
+  if (fromContext) return fromContext
+  try {
+    return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[key]
+  } catch {
+    return undefined
+  }
+}
 
 qrRoutes.get('/', (c) => {
   return c.text(`Hello You! Fiu is here 🐾
@@ -24,6 +57,7 @@ Send a request to /qr with the following query parameters:
   • size             (optional)  — QR code size in pixels (default: 300)
   • margin           (optional)  — Quiet zone margin in modules (default: 2, styled only)
   • ec_level         (optional)  — Error correction: L, M, Q, H (default: M)
+  • return_type      (optional)  — Output format: svg, png (default: svg; png requires BROWSERLESS_URL)
 
   ── Colors (both styles) ────────────────────────────────
   • color            (optional)  — Foreground color as hex, e.g. FF0000 or #FF0000 (default: 000000)
@@ -61,12 +95,14 @@ Send a request to /qr with the following query parameters:
 
 Examples:
   /qr?text=hello-world
+  /qr?text=hello-world&return_type=png
   /qr?text=https://example.com&size=500&label=Visit+Me&label_position=bottom&text_size=lg
   /qr?text=https://example.com&icon_url=https://example.com/logo.png
   /qr?text=https://example.com&color=1a1a2e&color_bg=e0e0ff
   /qr?text=https://example.com&style=styled&dot_type=dots&corner_square_type=extra-rounded
   /qr?text=https://example.com&style=styled&dot_type=rounded&gradient_type=linear&gradient_color1=8b5cf6&gradient_color2=ec4899
   /qr?text=https://example.com&style=styled&dot_type=classy&icon_url=https://example.com/logo.png&ec_level=H
+  /qr?text=https://example.com&style=styled&dot_type=dots&return_type=png&size=500
 `)
 })
 
@@ -86,6 +122,20 @@ qrRoutes.get('/qr', async (c) => {
   const ecLevelQuery = c.req.query('ec_level')?.toUpperCase()
   if (ecLevelQuery && !EC_LEVELS.has(ecLevelQuery)) {
     return c.json({ error: 'Invalid ec_level. Expected: L, M, Q, H' }, 400)
+  }
+
+  // ── Return type (svg | png) ─────────────────────────────
+  const returnType = c.req.query('return_type') || 'svg'
+  if (!RETURN_TYPES.has(returnType)) {
+    return c.json({ error: 'Invalid return_type. Expected: svg, png' }, 400)
+  }
+  const browserlessUrl = getEnv(c, 'BROWSERLESS_URL')
+  const pageUrlBase = getEnv(c, 'PAGE_URL')
+  if (returnType === 'png' && !browserlessUrl) {
+    return c.json({ error: 'PNG output requires BROWSERLESS_URL to be configured' }, 500)
+  }
+  if (returnType === 'png' && !pageUrlBase) {
+    return c.json({ error: 'PNG output requires PAGE_URL to be configured' }, 500)
   }
 
   // ── Color params ────────────────────────────────────────
@@ -206,26 +256,36 @@ qrRoutes.get('/qr', async (c) => {
       qrSvgString = embedIconInSvg(qrSvgString, dataUri, iconSize, colorBg || '#FFFFFF')
     }
 
-    // If no label, return the QR SVG image directly
-    if (!label) {
-      return new Response(qrSvgString, {
+    // Build the final SVG (with optional label)
+    const finalSvg = label
+      ? buildLabeledSvg(qrSvgString, {
+          label,
+          labelPosition,
+          textSizeKey,
+          paddingSizeKey,
+          size,
+          color: color || '#000000',
+          colorBg: colorBg || '#FFFFFF',
+        })
+      : qrSvgString
+
+    // ── PNG output: delegate to Browserless v2.51.0 /screenshot ──────
+    // The page URL handed to Browserless is this Worker's own /qr endpoint
+    // with `return_type` stripped, so the inner request returns plain SVG
+    // and the Worker → Browserless → Worker loop is broken.
+    if (returnType === 'png') {
+      const { width: pngWidth, height: pngHeight } = parseSvgDimensions(finalSvg, size)
+      const selfUrl = buildSvgPageUrl(c, pageUrlBase!)
+      const pngBuffer = await renderPngViaBrowserless(browserlessUrl!, selfUrl, pngWidth, pngHeight)
+      return new Response(pngBuffer, {
         headers: {
-          'Content-Type': 'image/svg+xml',
+          'Content-Type': 'image/png',
           'Cache-Control': 'public, max-age=3600',
         },
       })
     }
 
-    const finalSvg = buildLabeledSvg(qrSvgString, {
-      label,
-      labelPosition,
-      textSizeKey,
-      paddingSizeKey,
-      size,
-      color: color || '#000000',
-      colorBg: colorBg || '#FFFFFF',
-    })
-
+    // ── SVG output (default) ─────────────────────────────────────────
     return new Response(finalSvg, {
       headers: {
         'Content-Type': 'image/svg+xml',
@@ -233,6 +293,7 @@ qrRoutes.get('/qr', async (c) => {
       },
     })
   } catch (error) {
-    return c.json({ error: 'Failed to generate QR code' }, 500)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return c.json({ error: 'Failed to generate QR code', detail: message }, 500)
   }
 })

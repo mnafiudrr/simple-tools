@@ -2,13 +2,19 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "qr",
   "main": "src/index.ts",
-  "compatibility_date": "2026-05-15"
+  "compatibility_date": "2026-05-15",
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],
-  // "vars": {
-  //   "MY_VAR": "my-variable"
-  // },
+  "vars": {
+    // Base URL of the Browserless v2.51.0 service used for PNG output (return_type=png).
+    // For production secrets prefer: wrangler secret put BROWSERLESS_URL
+    "BROWSERLESS_URL": "http://localhost:3000",
+    // Public origin of this Worker, used by Browserless to load the SVG page.
+    // The /qr path is appended automatically. For production secrets prefer:
+    // wrangler secret put PAGE_URL
+    "PAGE_URL": "http://localhost:8787"
+  },
   // "kv_namespaces": [
   //   {
   //     "binding": "MY_KV_NAMESPACE",
