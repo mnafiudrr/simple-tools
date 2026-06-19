@@ -236,6 +236,6 @@ export function embedIconInSvg(
   return `${svgOpenTag}
     ${svgInnerContent}
     <rect x="${bgX}" y="${bgY}" width="${bgSize}" height="${bgSize}" rx="${rx}" ry="${rx}" fill="${colorBg}"/>
-    <image href="${iconDataUri}" x="${iconX}" y="${iconY}" width="${iconSize}" height="${iconSize}"/>
+    <image xmlns:xlink="http://www.w3.org/1999/xlink" href="${iconDataUri}" xlink:href="${iconDataUri}" x="${iconX}" y="${iconY}" width="${iconSize}" height="${iconSize}"/>
   </svg>`
 }

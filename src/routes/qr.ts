@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono'
 import { generateQrSvg, parseSvgDimensions } from '../utils/qr'
 import { generateStyledQrSvg } from '../utils/qr-styled'
 import { buildLabeledSvg, embedIconInSvg, parseHexColor } from '../utils/svg'
-import { renderPngViaBrowserless } from '../utils/browserless'
+import { renderPngLocally } from '../utils/resvg'
 
 export const qrRoutes = new Hono()
 
@@ -14,36 +14,6 @@ const GRADIENT_TYPES = new Set(['linear', 'radial'])
 const EC_LEVELS = new Set(['L', 'M', 'Q', 'H'])
 const RETURN_TYPES = new Set(['svg', 'png'])
 
-/**
- * Build the page URL Browserless should load.
- *
- * Uses the `PAGE_URL` env var (the public origin of this Worker, e.g.
- * `http://localhost:8787`) and appends `/qr` plus the incoming query string
- * with `return_type` stripped, so the inner request returns plain SVG and the
- * Worker → Browserless → Worker recursion is broken.
- */
-function buildSvgPageUrl(c: Context, pageUrlBase: string): string {
-  const incoming = new URL(c.req.url)
-  incoming.searchParams.delete('return_type')
-  const base = pageUrlBase.replace(/\/$/, '')
-  return `${base}/qr${incoming.search}`
-}
-
-/**
- * Read an environment variable in a runtime-agnostic way.
- *
- * - Cloudflare Workers: vars are exposed on `c.env`.
- * - AWS Lambda (hono/aws-lambda): vars live on `process.env` instead.
- */
-function getEnv(c: Context, key: string): string | undefined {
-  const fromContext = (c.env as Record<string, string | undefined> | undefined)?.[key]
-  if (fromContext) return fromContext
-  try {
-    return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[key]
-  } catch {
-    return undefined
-  }
-}
 
 qrRoutes.get('/', (c) => {
   return c.text(`Hello You! Fiu is here 🐾
@@ -128,14 +98,6 @@ qrRoutes.get('/qr', async (c) => {
   const returnType = c.req.query('return_type') || 'svg'
   if (!RETURN_TYPES.has(returnType)) {
     return c.json({ error: 'Invalid return_type. Expected: svg, png' }, 400)
-  }
-  const browserlessUrl = getEnv(c, 'BROWSERLESS_URL')
-  const pageUrlBase = getEnv(c, 'PAGE_URL')
-  if (returnType === 'png' && !browserlessUrl) {
-    return c.json({ error: 'PNG output requires BROWSERLESS_URL to be configured' }, 500)
-  }
-  if (returnType === 'png' && !pageUrlBase) {
-    return c.json({ error: 'PNG output requires PAGE_URL to be configured' }, 500)
   }
 
   // ── Color params ────────────────────────────────────────
@@ -269,14 +231,10 @@ qrRoutes.get('/qr', async (c) => {
         })
       : qrSvgString
 
-    // ── PNG output: delegate to Browserless v2.51.0 /screenshot ──────
-    // The page URL handed to Browserless is this Worker's own /qr endpoint
-    // with `return_type` stripped, so the inner request returns plain SVG
-    // and the Worker → Browserless → Worker loop is broken.
+    // ── PNG output: local conversion via @resvg/resvg-wasm ───────────
     if (returnType === 'png') {
-      const { width: pngWidth, height: pngHeight } = parseSvgDimensions(finalSvg, size)
-      const selfUrl = buildSvgPageUrl(c, pageUrlBase!)
-      const pngBuffer = await renderPngViaBrowserless(browserlessUrl!, selfUrl, pngWidth, pngHeight)
+      const { width: pngWidth } = parseSvgDimensions(finalSvg, size)
+      const pngBuffer = await renderPngLocally(finalSvg, pngWidth)
       return new Response(pngBuffer, {
         headers: {
           'Content-Type': 'image/png',

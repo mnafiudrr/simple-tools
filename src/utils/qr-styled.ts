@@ -144,5 +144,8 @@ export async function generateStyledQrSvg(options: StyledQrOptions): Promise<str
     throw new Error('Failed to generate styled QR SVG')
   }
 
-  return svgString
+  // resvg requires url(#id) without quotes, but the dom polyfill might serialize with quotes
+  const finalSvgString = svgString.replace(/url\('?(#[^']+)'?\)/g, 'url($1)')
+
+  return finalSvgString
 }
