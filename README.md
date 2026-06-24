@@ -30,31 +30,6 @@ bun run dev
 
 The server will start at `http://localhost:8787`.
 
-## Configuration
-
-### `BROWSERLESS_URL` and `PAGE_URL` (PNG output)
-
-PNG output (`return_type=png`) is rasterized by a [Browserless](https://www.browserless.io/) v2.51.0 headless-Chrome service. Two env vars are required:
-
-- **`BROWSERLESS_URL`** — base URL of your Browserless instance.
-- **`PAGE_URL`** — public origin of this Worker (e.g. `http://localhost:8787`). The `/qr` path is appended automatically.
-
-**Local dev** — create a `.env` file (see [`.env.example`](.env.example)):
-```
-BROWSERLESS_URL=http://localhost:3000
-PAGE_URL=http://localhost:8787
-```
-
-**Cloudflare Workers** — set them in [`wrangler.jsonc`](wrangler.jsonc) under `vars`, or for production secrets:
-```bash
-wrangler secret put BROWSERLESS_URL
-wrangler secret put PAGE_URL
-```
-
-**Browserless Cloud** — bake the API token into `BROWSERLESS_URL`, e.g. `https://chrome.browserless.io?token=YOUR_TOKEN`.
-
-The Worker calls `POST {BROWSERLESS_URL}/screenshot`, telling headless Chrome to load `{PAGE_URL}?<query>` (with `return_type` stripped to avoid an infinite loop) and screenshot the rendered SVG as PNG.
-
 ## API Usage
 
 ### `GET /qr`
@@ -70,7 +45,7 @@ Generate a QR code as an SVG (default) or PNG image.
 | `size`            | No       | `300`     | QR code size in pixels (min: 50, max: 2000)                     |
 | `margin`          | No       | `2`       | Quiet zone margin in modules (`styled` only)                     |
 | `ec_level`        | No       | `M`       | Error correction level: `L`, `M`, `Q`, `H`                      |
-| `return_type`     | No       | `svg`     | Output format: `svg` or `png` (`png` requires `BROWSERLESS_URL`) |
+| `return_type`     | No       | `svg`     | Output format: `svg` or `png` (`png` is rasterized locally via `@resvg/resvg-wasm`) |
 
 #### Color Parameters (both styles)
 
@@ -102,6 +77,7 @@ Generate a QR code as an SVG (default) or PNG image.
 | Parameter   | Required | Default    | Description                                                                  |
 |-------------|----------|------------|------------------------------------------------------------------------------|
 | `dot_type`  | No       | `square`   | Dot shape: `square`, `dots`, `rounded`, `extra-rounded`, `classy`, `classy-rounded` |
+| `dot_scale` | No       | `1.0`      | Dot scale factor (0.1–1.0)                                                   |
 
 #### Corner Square Parameters (`styled` only)
 
@@ -196,7 +172,7 @@ GET /qr?text=https://example.com&style=styled&dot_type=rounded&gradient_type=lin
 GET /qr?text=https://example.com&style=styled&dot_type=classy&icon_url=https://example.com/logo.png&icon_size=0.3&ec_level=H
 ```
 
-**PNG output (requires `BROWSERLESS_URL`):**
+**PNG output (rasterized locally via `@resvg/resvg-wasm`):**
 
 ```
 GET /qr?text=hello-world&return_type=png
@@ -211,7 +187,8 @@ GET /qr?text=https://example.com&style=styled&dot_type=dots&label=Scan+Me&label_
 
 #### Response
 
-- **Content-Type:** `image/svg+xml`
+- **SVG:** `Content-Type: image/svg+xml`
+- **PNG:** `Content-Type: image/png`
 - **Cache-Control:** `public, max-age=3600`
 
 #### Error Responses
@@ -265,6 +242,14 @@ This bundles the Lambda entry point into a single CommonJS file at `lambda/build
 
 Then upload the generated `lambda/build/index.js` file to your Lambda function via the AWS Management Console (Lambda → your function → Upload from).
 
+## PNG Rendering
+
+PNG output (`return_type=png`) is rasterized **locally** inside the Worker/Lambda using [`@resvg/resvg-wasm`](https://github.com/yisibl/resvg-js). No external headless-browser service is required.
+
+- The generated SVG is converted to a PNG buffer entirely in-process.
+- The bundled Roboto font (in [`src/utils/font.ts`](src/utils/font.ts)) is embedded so labels render correctly in the PNG.
+- WASM is initialized lazily on the first PNG request and reused for subsequent requests.
+
 ## Project Structure
 
 ```
@@ -274,6 +259,8 @@ src/
   utils/qr.ts           # Basic QR code generation (qrcode lib)
   utils/qr-styled.ts    # Styled QR code generation (qr-code-styling lib)
   utils/qr-styling.ts   # DOM polyfill + SVG serializer for qr-code-styling
+  utils/resvg.ts        # Local SVG → PNG rasterization (@resvg/resvg-wasm)
+  utils/font.ts         # Bundled Roboto font (base64) for PNG label rendering
   utils/svg.ts          # SVG label composition utilities
 lambda/
   index.ts              # AWS Lambda entry point (hono/aws-lambda adapter)
