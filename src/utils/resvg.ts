@@ -1,6 +1,6 @@
 import { initWasm, Resvg } from '@resvg/resvg-wasm';
 import wasmBase64 from '@resvg/resvg-wasm/index_bg.wasm';
-import { robotoBase64 } from './font';
+import { robotoBase64 } from '../generated/font';
 
 let wasmInitialized = false;
 let fontBuffer: Uint8Array;
