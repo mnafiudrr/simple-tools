@@ -51,8 +51,9 @@ Generate a QR code as an SVG (default) or PNG image.
 
 | Parameter   | Required | Default     | Description                                                    |
 |-------------|----------|-------------|----------------------------------------------------------------|
-| `color`     | No       | `000000`    | Foreground (dark module) color as hex, e.g. `FF0000` or `#FF0000` |
-| `color_bg`  | No       | `FFFFFF`    | Background (light module) color as hex, e.g. `FFFFFF` or `#FFFFFF` |
+| `color`          | No       | `000000`    | Foreground (dark module) color as hex, e.g. `FF0000` or `#FF0000` |
+| `color_bg`       | No       | `FFFFFF`    | Background (light module) color as hex, e.g. `FFFFFF` or `#FFFFFF` |
+| `bg_transparent` | No       | `false`     | Render the whole file with no background (transparent QR light modules + label canvas). Accepts `true`, `1`, `yes`. Works for both `svg` and `png`. Overrides `color_bg` when set. Does not affect the icon backdrop (see `icon_bg_transparent`). |
 
 #### Label Parameters (both styles)
 
@@ -71,6 +72,7 @@ Generate a QR code as an SVG (default) or PNG image.
 | `icon_size`          | No       | `0.25`    | styled   | Icon size as fraction of QR size (0.1–0.5)               |
 | `icon_margin`        | No       | `0`       | styled   | Margin around icon in pixels                             |
 | `icon_hide_bg_dots`  | No       | `true`    | styled   | Hide QR dots behind icon: `true`, `false`                |
+| `icon_bg_transparent`| No       | `false`   | both     | Render the icon with no backdrop rect (transparent). Accepts `true`, `1`, `yes`. Independent of `bg_transparent`. |
 
 #### Dot Style Parameters (`styled` only)
 
@@ -140,6 +142,13 @@ GET /qr?text=hello-world&size=600&label=ScanMe&label_position=right&text_size=xl
 
 ```
 GET /qr?text=https://example.com&color=1a1a2e&color_bg=e0e0ff
+```
+
+**QR code with transparent background (SVG or PNG):**
+
+```
+GET /qr?text=hello-world&bg_transparent=true
+GET /qr?text=hello-world&return_type=png&bg_transparent=true
 ```
 
 **QR code with embedded icon (basic style):**

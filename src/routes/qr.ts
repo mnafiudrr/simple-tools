@@ -13,6 +13,8 @@ qrRoutes.get('/qr', async (c) => {
     return_type: c.req.query('return_type'),
     color: c.req.query('color'),
     color_bg: c.req.query('color_bg'),
+    bg_transparent: c.req.query('bg_transparent'),
+    icon_bg_transparent: c.req.query('icon_bg_transparent'),
     label: c.req.query('label'),
     label_position: c.req.query('label_position'),
     text_size: c.req.query('text_size'),
@@ -32,6 +34,10 @@ qrRoutes.get('/qr', async (c) => {
     gradient_color2: c.req.query('gradient_color2'),
     gradient_rotation: c.req.query('gradient_rotation'),
   }
+
+  if (!params.bg_transparent) {
+    params.color_bg = '#FFFFFF'
+  } 
 
   const result = await generateQr(params)
 

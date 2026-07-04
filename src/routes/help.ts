@@ -42,3 +42,13 @@ helpRoutes.get('/help/:tool', (c) => {
   }
   return renderPage(`${tool.meta.name} — Help`, tool.docsHtml)
 })
+
+// GET / for default tool: QR
+helpRoutes.get('/', (c) => {
+  const name = 'qr'
+  const tool = tools.find((t) => t.meta.name === name)
+  if (!tool) {
+    return renderPage('Not Found', `<p>Unknown tool: ${name}</p>`, 404)
+  }
+  return renderPage(`${tool.meta.name} — Help`, tool.docsHtml)
+})

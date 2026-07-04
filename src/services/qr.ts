@@ -35,6 +35,8 @@ export interface QrParams {
   return_type?: string
   color?: string
   color_bg?: string
+  bg_transparent?: string
+  icon_bg_transparent?: string
   label?: string
   label_position?: string
   text_size?: string
@@ -84,6 +86,15 @@ export async function generateQr(params: QrParams): Promise<QrResult> {
   // ── Color params ────────────────────────────────────────
   const color = parseHexColor(params.color)
   const colorBg = parseHexColor(params.color_bg)
+
+  // bg_transparent suppresses the WHOLE-FILE background (QR light modules,
+  // styled engine bg, label canvas). It does NOT affect the icon backdrop.
+  // When truthy it wins over any color_bg value. Default: false.
+  const bgTransparent = ['true', '1', 'yes'].includes((params.bg_transparent || '').toLowerCase())
+
+  // icon_bg_transparent suppresses ONLY the icon's backdrop rect, independently
+  // of bg_transparent. Default: false (icon keeps its white/color_bg backdrop).
+  const iconBgTransparent = ['true', '1', 'yes'].includes((params.icon_bg_transparent || '').toLowerCase())
 
   if (params.color && !color) {
     return { kind: 'error', status: 400, error: 'Invalid color format. Expected hex, e.g. FF0000 or #FF0000' }
@@ -161,7 +172,7 @@ export async function generateQr(params: QrParams): Promise<QrResult> {
         cornerSquareColor: cornerSquareColor || undefined,
         cornerDotType: cornerDotType as any || undefined,
         cornerDotColor: cornerDotColor || undefined,
-        bgColor: colorBg || undefined,
+        bgColor: bgTransparent ? undefined : (colorBg || undefined),
         gradientType: gradientType as any || undefined,
         gradientColor1: gradientColor1 || undefined,
         gradientColor2: gradientColor2 || undefined,
@@ -174,8 +185,12 @@ export async function generateQr(params: QrParams): Promise<QrResult> {
         ? (iconUrl ? 'H' : ecLevelQuery)
         : (iconUrl ? 'H' : 'M')
 
-      // Build QR color option — only pass when at least one is specified
-      const qrColor = (color || colorBg) ? { dark: color || '#000000', light: colorBg || '#ffffff' } : undefined
+      // Build QR color option.
+      // - When bgTransparent, set light modules to fully transparent (#0000 = 8-digit hex alpha).
+      // - Otherwise only pass when at least one color is explicitly specified (preserves prior default-white behaviour).
+      const qrColor = (color || colorBg || bgTransparent)
+        ? { dark: color || '#000000', light: bgTransparent ? '#0000' : (colorBg || '#ffffff') }
+        : undefined
 
       qrSvgString = await generateQrSvg(text, size, ecLevel as 'L' | 'M' | 'Q' | 'H', qrColor)
     }
@@ -196,7 +211,10 @@ export async function generateQr(params: QrParams): Promise<QrResult> {
       const dataUri = `data:${contentType};base64,${base64}`
       const iconSize = Math.max(0.1, Math.min(0.5, parseFloat(params.icon_size || '0.25')))
 
-      qrSvgString = embedIconInSvg(qrSvgString, dataUri, iconSize, colorBg || '#FFFFFF')
+      // Icon backdrop is controlled independently by icon_bg_transparent.
+      // It defaults to the file background color (colorBg or white) and is only
+      // suppressed when icon_bg_transparent=true — regardless of bg_transparent.
+      qrSvgString = embedIconInSvg(qrSvgString, dataUri, iconSize, iconBgTransparent ? undefined : (colorBg || '#FFFFFF'))
     }
 
     // Build the final SVG (with optional label)
@@ -208,7 +226,7 @@ export async function generateQr(params: QrParams): Promise<QrResult> {
           paddingSizeKey,
           size,
           color: color || '#000000',
-          colorBg: colorBg || '#FFFFFF',
+          colorBg: bgTransparent ? undefined : (colorBg || '#FFFFFF'),
         })
       : qrSvgString
 

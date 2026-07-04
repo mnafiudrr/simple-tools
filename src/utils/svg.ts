@@ -178,8 +178,13 @@ export function buildLabeledSvg(qrSvgString: string, options: LabelOptions): str
     })
     .join('\n')
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}">
-    <rect width="${canvasWidth}" height="${canvasHeight}" fill="${colorBg || '#FFFFFF'}"/>
+  // Background canvas rect — only emitted when an explicit colorBg is provided.
+  // When undefined (e.g. bg_transparent=true), the SVG stays background-free.
+  const bgRect = colorBg
+    ? `\n    <rect width="${canvasWidth}" height="${canvasHeight}" fill="${colorBg}"/>`
+    : ''
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}">${bgRect}
     <g transform="translate(${qrX}, ${qrY})">
       <svg width="${qrWidth}" height="${qrHeight}" viewBox="${escapeXml(viewBox)}">
         ${svgInnerContent}
@@ -206,7 +211,7 @@ export function embedIconInSvg(
   qrSvgString: string,
   iconDataUri: string,
   iconRatio = 0.25,
-  colorBg = '#FFFFFF',
+  colorBg?: string,
 ): string {
   const { viewBox } = parseSvgDimensions(qrSvgString, 300)
 
@@ -233,9 +238,15 @@ export function embedIconInSvg(
   const svgTagMatch = qrSvgString.match(/<svg[^>]*>/)
   const svgOpenTag = svgTagMatch ? svgTagMatch[0] : '<svg xmlns="http://www.w3.org/2000/svg">'
 
+  // Backdrop rect behind the icon — only emitted when an explicit colorBg is
+  // provided. When undefined (e.g. bg_transparent=true), the icon sits directly
+  // on a transparent background.
+  const bgRect = colorBg
+    ? `\n    <rect x="${bgX}" y="${bgY}" width="${bgSize}" height="${bgSize}" rx="${rx}" ry="${rx}" fill="${colorBg}"/>`
+    : ''
+
   return `${svgOpenTag}
-    ${svgInnerContent}
-    <rect x="${bgX}" y="${bgY}" width="${bgSize}" height="${bgSize}" rx="${rx}" ry="${rx}" fill="${colorBg}"/>
+    ${svgInnerContent}${bgRect}
     <image xmlns:xlink="http://www.w3.org/1999/xlink" href="${iconDataUri}" xlink:href="${iconDataUri}" x="${iconX}" y="${iconY}" width="${iconSize}" height="${iconSize}"/>
   </svg>`
 }

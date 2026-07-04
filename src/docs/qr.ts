@@ -40,6 +40,7 @@ export const qrDocsHtml = `
     <tbody>
       <tr><td><code>color</code></td><td>No</td><td><code>000000</code></td><td>Foreground color as hex, e.g. <code>FF0000</code> or <code>#FF0000</code></td></tr>
       <tr><td><code>color_bg</code></td><td>No</td><td><code>FFFFFF</code></td><td>Background color as hex, e.g. <code>FFFFFF</code> or <code>#FFFFFF</code></td></tr>
+      <tr><td><code>bg_transparent</code></td><td>No</td><td><code>false</code></td><td>Render the whole file with no background (transparent QR light modules + label canvas). Accepts <code>true</code>, <code>1</code>, <code>yes</code>. Works for both <code>svg</code> and <code>png</code>. Overrides <code>color_bg</code> when set. Does <strong>not</strong> affect the icon backdrop (see <code>icon_bg_transparent</code>).</td></tr>
     </tbody>
   </table>
 
@@ -62,6 +63,7 @@ export const qrDocsHtml = `
       <tr><td><code>icon_size</code></td><td>No</td><td><code>0.25</code></td><td>styled</td><td>Icon size as fraction of QR size (0.1–0.5)</td></tr>
       <tr><td><code>icon_margin</code></td><td>No</td><td><code>0</code></td><td>styled</td><td>Margin around icon in pixels</td></tr>
       <tr><td><code>icon_hide_bg_dots</code></td><td>No</td><td><code>true</code></td><td>styled</td><td>Hide QR dots behind icon: <code>true</code>, <code>false</code></td></tr>
+      <tr><td><code>icon_bg_transparent</code></td><td>No</td><td><code>false</code></td><td>both</td><td>Render the icon with no backdrop rect (transparent). Accepts <code>true</code>, <code>1</code>, <code>yes</code>. Independent of <code>bg_transparent</code>.</td></tr>
     </tbody>
   </table>
 
@@ -108,6 +110,8 @@ export const qrDocsHtml = `
   <pre><code>GET /qr?text=hello-world
 GET /qr?text=hello-world&return_type=png
 GET /qr?text=hello-world&label=ScanMe
+GET /qr?text=hello-world&bg_transparent=true
+GET /qr?text=hello-world&return_type=png&bg_transparent=true
 GET /qr?text=https://example.com&color=1a1a2e&color_bg=e0e0ff
 GET /qr?text=https://example.com&icon_url=https://example.com/logo.png
 GET /qr?text=https://example.com&style=styled&dot_type=dots

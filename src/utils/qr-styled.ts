@@ -122,9 +122,10 @@ export async function generateStyledQrSvg(options: StyledQrOptions): Promise<str
       ...(cornerDotType ? { type: cornerDotType } : {}),
       ...(cornerDotColor ? { color: cornerDotColor } : {}),
     },
-    backgroundOptions: {
-      color: bgColor || '#ffffff',
-    },
+    // When no bgColor is supplied, make the background fully transparent.
+    // Using a transparent fill keeps output type-safe across qr-code-styling
+    // versions and produces a background-free SVG (and transparent PNG via resvg).
+    backgroundOptions: { color: bgColor || 'rgba(0,0,0,0)' },
     ...(imageUrl
       ? {
           image: imageUrl,
